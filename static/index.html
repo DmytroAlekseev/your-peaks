@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Твої Вершини</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 200px;
+      --sidebar-bg: #1b4332;
+      --sidebar-hover: #2d6a4f;
+      --sidebar-active: #40916c;
+      --accent: #52b788;
+      --accent-light: #d8f3dc;
+      --bg: #f4f7f5;
+      --white: #ffffff;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --border: #dee2e6;
+      --climbed-color: #40916c;
+      --unchecked-color: #adb5bd;
+      --danger: #dc3545;
+      --shadow: 0 2px 8px rgba(0,0,0,.10);
+      --radius: 8px;
+    }
+
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Auth screen ──────────────────────────────────── */
+    #auth-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #40916c 100%);
+    }
+
+    .auth-card {
+      background: var(--white); border-radius: 16px; padding: 40px;
+      width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+
+    .auth-logo { text-align: center; margin-bottom: 28px; }
+    .auth-logo .icon { font-size: 48px; display: block; margin-bottom: 8px; }
+    .auth-logo h1 { font-size: 22px; font-weight: 700; color: var(--sidebar-bg); }
+    .auth-logo p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .auth-tabs { display: flex; gap: 0; margin-bottom: 24px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+    .auth-tab {
+      flex: 1; padding: 10px; text-align: center; cursor: pointer;
+      font-size: 14px; font-weight: 500; background: var(--bg); color: var(--text-muted);
+      transition: all .2s;
+    }
+    .auth-tab.active { background: var(--sidebar-bg); color: white; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+    .form-group input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 14px; outline: none; transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+
+    .btn-primary {
+      width: 100%; padding: 12px; background: var(--sidebar-bg); color: white;
+      border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background .2s; margin-top: 4px;
+    }
+    .btn-primary:hover { background: var(--sidebar-hover); }
+
+    .auth-error {
+      color: var(--danger); font-size: 13px; margin-top: 12px; text-align: center;
+      min-height: 18px;
+    }
+
+    /* ── App layout ──────────────────────────────────── */
+    #app-screen {
+      display: flex; height: 100vh;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      width: var(--sidebar-w); background: var(--sidebar-bg); color: white;
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+
+    .sidebar-logo {
+      padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .sidebar-logo .logo-icon { font-size: 28px; display: block; }
+    .sidebar-logo .logo-title { font-size: 16px; font-weight: 700; margin-top: 4px; }
+    .sidebar-logo .logo-sub { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 2px; }
+
+    .sidebar-nav { flex: 1; padding: 12px 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 16px; cursor: pointer; font-size: 14px; font-weight: 500;
+      transition: background .15s; border-radius: 0;
+    }
+    .nav-item:hover { background: var(--sidebar-hover); }
+    .nav-item.active { background: var(--sidebar-active); }
+    .nav-item .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px; border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .sidebar-user { font-size: 13px; color: rgba(255,255,255,.7); margin-bottom: 10px; }
+    .sidebar-user strong { color: white; display: block; font-size: 14px; }
+
+    .btn-logout {
+      width: 100%; padding: 8px; background: rgba(255,255,255,.1);
+      color: white; border: none; border-radius: var(--radius); font-size: 13px;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.2); }
+
+    /* Main content */
+    #main-content {
+      flex: 1; overflow: hidden; display: flex; flex-direction: column;
+    }
+
+    .topbar {
+      background: var(--white); padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: var(--shadow); flex-shrink: 0;
+    }
+    .topbar h2 { font-size: 18px; font-weight: 600; }
+    .topbar-right { font-size: 13px; color: var(--text-muted); }
+    .topbar-right span { color: var(--accent); font-weight: 600; }
+
+    .view { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+    .view.active { display: flex; }
+
+    /* ── Map view ─────────────────────────────────────── */
+    #map { flex: 1; }
+
+    /* ── List view ────────────────────────────────────── */
+    .list-controls {
+      background: var(--white); padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      flex-shrink: 0;
+    }
+
+    .list-controls input, .list-controls select {
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 13px; outline: none; background: var(--bg); transition: border-color .2s;
+    }
+    .list-controls input:focus, .list-controls select:focus { border-color: var(--accent); background: white; }
+    #search-input { flex: 1; min-width: 160px; }
+
+    .btn-filter {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 13px; cursor: pointer; background: var(--bg); transition: all .15s;
+    }
+    .btn-filter.active { background: var(--accent-light); border-color: var(--accent); color: var(--climbed-color); font-weight: 600; }
+
+    .list-wrapper { flex: 1; overflow-y: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th {
+      position: sticky; top: 0; background: var(--white);
+      padding: 10px 16px; text-align: left; font-weight: 600; font-size: 13px;
+      color: var(--text-muted); border-bottom: 2px solid var(--border);
+      cursor: pointer; user-select: none;
+    }
+    thead th:hover { color: var(--text); }
+    thead th .sort-icon { margin-left: 4px; font-size: 11px; }
+
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:hover { background: #f9fbfa; }
+    tbody tr.climbed-row { background: #f0faf5; }
+    tbody tr.climbed-row:hover { background: #e6f7ee; }
+
+    td { padding: 10px 16px; vertical-align: middle; }
+    td.td-id { color: var(--text-muted); font-size: 12px; }
+    td.td-name { font-weight: 500; }
+    td.td-elev { font-weight: 600; color: var(--sidebar-bg); }
+    td.td-region { font-size: 12px; color: var(--text-muted); }
+
+    .climbed-btn {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid; transition: all .15s;
+    }
+    .climbed-btn.not-climbed {
+      background: transparent; border-color: var(--unchecked-color); color: var(--unchecked-color);
+    }
+    .climbed-btn.not-climbed:hover { border-color: var(--climbed-color); color: var(--climbed-color); }
+    .climbed-btn.is-climbed {
+      background: var(--climbed-color); border-color: var(--climbed-color); color: white;
+    }
+    .climbed-btn.is-climbed:hover { background: var(--danger); border-color: var(--danger); }
+
+    .list-count { padding: 8px 20px; font-size: 13px; color: var(--text-muted); background: var(--bg); flex-shrink: 0; border-top: 1px solid var(--border); }
+
+    /* ── Profile view ─────────────────────────────────── */
+    .profile-wrapper { flex: 1; overflow-y: auto; padding: 24px; }
+
+    .profile-header { margin-bottom: 24px; }
+    .profile-header h2 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .profile-header p { color: var(--text-muted); font-size: 14px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--white); border-radius: var(--radius); padding: 20px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .stat-card .stat-value { font-size: 32px; font-weight: 700; color: var(--sidebar-bg); }
+    .stat-card .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .progress-section {
+      background: var(--white); border-radius: var(--radius); padding: 20px;
+      box-shadow: var(--shadow); margin-bottom: 28px;
+    }
+    .progress-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+    .progress-bar-bg {
+      background: var(--border); border-radius: 8px; height: 14px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #40916c, #74c69d);
+      border-radius: 8px; transition: width .6s ease;
+    }
+    .progress-label { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+
+    .climbed-list-section { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .climbed-list-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+    .climbed-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .climbed-item:last-child { border-bottom: none; }
+    .climbed-item .ci-name { font-weight: 500; }
+    .climbed-item .ci-elev { color: var(--climbed-color); font-weight: 600; font-size: 13px; }
+    .climbed-item .ci-date { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+    .climbed-item .ci-region { font-size: 12px; color: var(--text-muted); }
+
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-state .es-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+
+    /* Map popup custom style */
+    .map-popup { min-width: 180px; }
+    .map-popup h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .map-popup .mp-elev { font-size: 13px; color: var(--climbed-color); font-weight: 600; margin-bottom: 4px; }
+    .map-popup .mp-region { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .map-popup .mp-btn {
+      display: block; width: 100%; padding: 7px 0; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+    }
+    .map-popup .mp-btn.not-climbed { background: var(--sidebar-bg); color: white; }
+    .map-popup .mp-btn.not-climbed:hover { background: var(--sidebar-active); }
+    .map-popup .mp-btn.is-climbed { background: #e9f7ef; color: var(--climbed-color); border: 1.5px solid var(--climbed-color); }
+    .map-popup .mp-btn.is-climbed:hover { background: #fdecea; color: var(--danger); border-color: var(--danger); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════ AUTH SCREEN ═══════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="icon">🏔</span>
+      <h1>Твої Вершини</h1>
+      <p>Відстежуй підкорені вершини Карпат</p>
+    </div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Увійти</div>
+      <div class="auth-tab" id="tab-register" onclick="switchTab('register')">Реєстрація</div>
+    </div>
+
+    <!-- Login form -->
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Логін</label>
+        <input type="text" id="login-username" placeholder="Ваш логін" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input type="password" id="login-password" placeholder="Ваш пароль" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn-primary">Увійти</button>
+    </form>
+
+    <!-- Register form -->
+    <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label>Логін</label>
+        <input type="text" id="reg-username" placeholder="Оберіть логін" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="your@email.com" required autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input type="password" id="reg-password" placeholder="Мінімум 6 символів" required autocomplete="new-password" minlength="6" />
+      </div>
+      <button type="submit" class="btn-primary">Створити акаунт</button>
+    </form>
+
+    <div class="auth-error" id="auth-error"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ APP SCREEN ════════════════════════════════════ -->
+<div id="app-screen" class="hidden">
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🏔</span>
+      <div class="logo-title">Твої Вершини</div>
+      <div class="logo-sub">Українські Карпати</div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-view="map" onclick="navigate('map')">
+        <span class="nav-icon">🗺</span> Карта
+      </div>
+      <div class="nav-item" data-view="list" onclick="navigate('list')">
+        <span class="nav-icon">📋</span> Список
+      </div>
+      <div class="nav-item" data-view="profile" onclick="navigate('profile')">
+        <span class="nav-icon">👤</span> Профіль
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        Вітаємо,<strong id="sidebar-username">—</strong>
+      </div>
+      <button class="btn-logout" onclick="logout()">🚪 Вийти</button>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div id="main-content">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <h2 id="topbar-title">Карта вершин</h2>
+      <div class="topbar-right" id="topbar-stats">Завантаження...</div>
+    </div>
+
+    <!-- ── MAP VIEW ────────────────────────────── -->
+    <div id="view-map" class="view active">
+      <div id="map"></div>
+    </div>
+
+    <!-- ── LIST VIEW ───────────────────────────── -->
+    <div id="view-list" class="view">
+      <div class="list-controls">
+        <input type="text" id="search-input" placeholder="🔍  Пошук за назвою..." oninput="applyFilters()" />
+        <select id="filter-oblast" onchange="applyFilters()">
+          <option value="">Всі області</option>
+        </select>
+        <select id="filter-raion" onchange="applyFilters()">
+          <option value="">Всі райони</option>
+        </select>
+        <input type="number" id="filter-min-elev" placeholder="Від, м" style="width:90px" oninput="applyFilters()" />
+        <input type="number" id="filter-max-elev" placeholder="До, м" style="width:90px" oninput="applyFilters()" />
+        <button class="btn-filter" id="btn-only-climbed" onclick="toggleOnlyClimbed()">✅ Тільки підкорені</button>
+      </div>
+
+      <div class="list-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('id')"># <span class="sort-icon" id="sort-id"></span></th>
+              <th onclick="sortBy('name')">Назва <span class="sort-icon" id="sort-name"></span></th>
+              <th onclick="sortBy('elevation_m')">Висота <span class="sort-icon" id="sort-elevation_m">▼</span></th>
+              <th>Район</th>
+              <th>Стан</th>
+            </tr>
+          </thead>
+          <tbody id="mountains-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="list-count" id="list-count"></div>
+    </div>
+
+    <!-- ── PROFILE VIEW ─────────────────────────── -->
+    <div id="view-profile" class="view">
+      <div class="profile-wrapper">
+        <div class="profile-header">
+          <h2 id="profile-username"></h2>
+          <p id="profile-email"></p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Всього вершин</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-climbed">—</div>
+            <div class="stat-label">Підкорено</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-percent">—</div>
+            <div class="stat-label">Прогрес</div>
+          </div>
+        </div>
+
+        <div class="progress-section">
+          <h3>Загальний прогрес</h3>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+          <div class="progress-label" id="progress-label"></div>
+        </div>
+
+        <div class="climbed-list-section">
+          <h3>Підкорені вершини</h3>
+          <div id="profile-climbed-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /app-screen -->
+
+
+<script>
+// ════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════
+const state = {
+  token: localStorage.getItem('tvoi_token'),
+  username: localStorage.getItem('tvoi_username'),
+  mountains: [],         // full list with climbed flags
+  filtered: [],          // after filters
+  currentView: 'map',
+  sortKey: 'elevation_m',
+  sortAsc: false,
+  onlyClimbed: false,
+  map: null,
+  markers: {},           // id -> L.circleMarker
+  meta: { oblasts: [], raions: [], total: 0 },
+};
+
+// ════════════════════════════════════════════════════════
+//  API helper
+// ════════════════════════════════════════════════════════
+async function api(method, url, body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${state.token}`,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ════════════════════════════════════════════════════════
+//  Auth
+// ════════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+async function authFetch(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = 'Помилка сервера';
+    try { detail = (await res.json()).detail || detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  document.getElementById('auth-error').textContent = '';
+  try {
+    const data = await authFetch('/api/auth/login', { username, password });
+    storeSession(data);
+    initApp();
+  } catch (err) {
+    document.getElementById('auth-error').textContent = err.message;
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const username = document.getElementById('reg-username').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  document.getElementById('auth-error').textContent = '';
+  try {
+    const data = await authFetch('/api/auth/register', { username, email, password });
+    storeSession(data);
+    initApp();
+  } catch (err) {
+    document.getElementById('auth-error').textContent = err.message;
+  }
+}
+
+function storeSession(data) {
+  state.token = data.access_token;
+  state.username = data.username;
+  localStorage.setItem('tvoi_token', data.access_token);
+  localStorage.setItem('tvoi_username', data.username);
+}
+
+function logout() {
+  localStorage.removeItem('tvoi_token');
+  localStorage.removeItem('tvoi_username');
+  state.token = null;
+  state.username = null;
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-screen').classList.add('hidden');
+}
+
+// ════════════════════════════════════════════════════════
+//  Navigation
+// ════════════════════════════════════════════════════════
+const VIEW_TITLES = { map: 'Карта вершин', list: 'Список вершин', profile: 'Мій профіль' };
+
+function navigate(view) {
+  state.currentView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelector(`.nav-item[data-view="${view}"]`).classList.add('active');
+  document.getElementById('topbar-title').textContent = VIEW_TITLES[view];
+
+  if (view === 'map') {
+    // Force Leaflet to recalc size in case it was hidden
+    setTimeout(() => state.map && state.map.invalidateSize(), 50);
+  }
+  if (view === 'profile') loadProfile();
+}
+
+// ════════════════════════════════════════════════════════
+//  Data loading
+// ════════════════════════════════════════════════════════
+async function loadData() {
+  const [mountains, meta] = await Promise.all([
+    api('GET', '/api/mountains'),
+    api('GET', '/api/mountains/meta'),
+  ]);
+  state.mountains = mountains;
+  state.meta = meta;
+
+  // Populate oblast filter
+  const oblastSel = document.getElementById('filter-oblast');
+  meta.oblasts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o; opt.textContent = o;
+    oblastSel.appendChild(opt);
+  });
+
+  updateTopbarStats();
+  renderMap();
+  renderList();
+}
+
+function updateTopbarStats() {
+  const climbed = state.mountains.filter(m => m.climbed).length;
+  const total = state.mountains.length;
+  document.getElementById('topbar-stats').innerHTML =
+    `Підкорено: <span>${climbed}</span> з ${total}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  MAP
+// ════════════════════════════════════════════════════════
+function markerOptions(climbed) {
+  return {
+    radius: climbed ? 7 : 5,
+    fillColor: climbed ? '#40916c' : '#adb5bd',
+    color: climbed ? '#1b4332' : '#6c757d',
+    weight: 1,
+    opacity: 1,
+    fillOpacity: climbed ? 0.9 : 0.7,
+  };
+}
+
+function buildPopupHtml(m) {
+  const cls = m.climbed ? 'is-climbed' : 'not-climbed';
+  const label = m.climbed ? '✅ Підкорено — зняти позначку' : '🏔 Відмітити як підкорену';
+  return `
+    <div class="map-popup">
+      <h4>${m.name}</h4>
+      <div class="mp-elev">${m.elevation_m} м</div>
+      <div class="mp-region">${m.raion}</div>
+      <button class="mp-btn ${cls}" onclick="toggleClimbed('${m.id}')">${label}</button>
+    </div>`;
+}
+
+function renderMap() {
+  if (!state.map) {
+    state.map = L.map('map').setView([48.5, 23.5], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(state.map);
+  }
+
+  // Clear existing markers
+  Object.values(state.markers).forEach(m => m.remove());
+  state.markers = {};
+
+  state.mountains.forEach(m => {
+    const marker = L.circleMarker([m.lat, m.lon], markerOptions(m.climbed))
+      .bindPopup(buildPopupHtml(m), { maxWidth: 220 })
+      .addTo(state.map);
+    state.markers[m.id] = marker;
+  });
+}
+
+function updateMarkerOnMap(mountainId) {
+  const m = state.mountains.find(x => x.id === mountainId);
+  if (!m || !state.markers[mountainId]) return;
+  const marker = state.markers[mountainId];
+  marker.setStyle(markerOptions(m.climbed));
+  // Refresh popup content if open
+  if (marker.isPopupOpen()) {
+    marker.setPopupContent(buildPopupHtml(m));
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  LIST
+// ════════════════════════════════════════════════════════
+function applyFilters() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const oblast = document.getElementById('filter-oblast').value;
+  const raion = document.getElementById('filter-raion').value;
+  const minElev = parseInt(document.getElementById('filter-min-elev').value) || 0;
+  const maxElev = parseInt(document.getElementById('filter-max-elev').value) || Infinity;
+
+  state.filtered = state.mountains.filter(m => {
+    if (search && !m.name.toLowerCase().includes(search)) return false;
+    if (oblast && m.oblast !== oblast) return false;
+    if (raion && m.raion !== raion) return false;
+    if (m.elevation_m < minElev || m.elevation_m > maxElev) return false;
+    if (state.onlyClimbed && !m.climbed) return false;
+    return true;
+  });
+
+  // Sort
+  state.filtered.sort((a, b) => {
+    let va = a[state.sortKey], vb = b[state.sortKey];
+    if (typeof va === 'string') va = va.toLowerCase(), vb = vb.toLowerCase();
+    return state.sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+
+  renderListRows();
+
+  // Update raion dropdown based on selected oblast
+  updateRaionFilter(oblast);
+}
+
+function updateRaionFilter(selectedOblast) {
+  const raionSel = document.getElementById('filter-raion');
+  const currentRaion = raionSel.value;
+  raionSel.innerHTML = '<option value="">Всі райони</option>';
+  const raions = selectedOblast
+    ? [...new Set(state.mountains.filter(m => m.oblast === selectedOblast).map(m => m.raion))].sort()
+    : state.meta.raions;
+  raions.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    if (r === currentRaion) opt.selected = true;
+    raionSel.appendChild(opt);
+  });
+}
+
+function sortBy(key) {
+  if (state.sortKey === key) {
+    state.sortAsc = !state.sortAsc;
+  } else {
+    state.sortKey = key;
+    state.sortAsc = key === 'name';
+  }
+  // Update sort icons
+  ['id', 'name', 'elevation_m'].forEach(k => {
+    const el = document.getElementById(`sort-${k}`);
+    if (!el) return;
+    if (k === state.sortKey) el.textContent = state.sortAsc ? '▲' : '▼';
+    else el.textContent = '';
+  });
+  applyFilters();
+}
+
+function toggleOnlyClimbed() {
+  state.onlyClimbed = !state.onlyClimbed;
+  document.getElementById('btn-only-climbed').classList.toggle('active', state.onlyClimbed);
+  applyFilters();
+}
+
+function renderListRows() {
+  const tbody = document.getElementById('mountains-tbody');
+  const rows = state.filtered.map(m => {
+    const cls = m.climbed ? 'climbed-row' : '';
+    const btnCls = m.climbed ? 'is-climbed' : 'not-climbed';
+    const btnLabel = m.climbed ? '✅ Підкорено' : 'Відмітити';
+    return `<tr class="${cls}" id="row-${m.id}">
+      <td class="td-id">${m.id}</td>
+      <td class="td-name">${m.name}</td>
+      <td class="td-elev">${m.elevation_m} м</td>
+      <td class="td-region">${m.raion}</td>
+      <td><button class="climbed-btn ${btnCls}" onclick="toggleClimbed('${m.id}')">${btnLabel}</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = rows.join('');
+  document.getElementById('list-count').textContent =
+    `Показано: ${state.filtered.length} з ${state.mountains.length} вершин`;
+}
+
+function renderList() {
+  state.filtered = [...state.mountains];
+  state.filtered.sort((a, b) => b.elevation_m - a.elevation_m);
+  renderListRows();
+}
+
+function updateListRow(mountainId) {
+  const m = state.mountains.find(x => x.id === mountainId);
+  const row = document.getElementById(`row-${m.id}`);
+  if (!row) return;
+  row.className = m.climbed ? 'climbed-row' : '';
+  const btn = row.querySelector('.climbed-btn');
+  btn.className = `climbed-btn ${m.climbed ? 'is-climbed' : 'not-climbed'}`;
+  btn.textContent = m.climbed ? '✅ Підкорено' : 'Відмітити';
+}
+
+// ════════════════════════════════════════════════════════
+//  PROFILE
+// ════════════════════════════════════════════════════════
+async function loadProfile() {
+  try {
+    const p = await api('GET', '/api/profile');
+    document.getElementById('profile-username').textContent = p.username;
+    document.getElementById('profile-email').textContent = p.email;
+    document.getElementById('stat-total').textContent = p.total_mountains;
+    document.getElementById('stat-climbed').textContent = p.climbed_count;
+    document.getElementById('stat-percent').textContent = p.climbed_percent + '%';
+    document.getElementById('progress-fill').style.width = p.climbed_percent + '%';
+    document.getElementById('progress-label').textContent =
+      `${p.climbed_count} з ${p.total_mountains} вершин підкорено`;
+
+    const list = document.getElementById('profile-climbed-list');
+    if (p.climbed_mountains.length === 0) {
+      list.innerHTML = `<div class="empty-state"><span class="es-icon">🏔</span>Ще жодної вершини не підкорено.<br>Починай свій шлях!</div>`;
+    } else {
+      list.innerHTML = p.climbed_mountains.map(m => `
+        <div class="climbed-item">
+          <div>
+            <div class="ci-name">${m.name}</div>
+            <div class="ci-region">${m.raion}</div>
+            ${m.climbed_at ? `<div class="ci-date">${formatDate(m.climbed_at)}</div>` : ''}
+          </div>
+          <div class="ci-elev">${m.elevation_m} м</div>
+        </div>`).join('');
+    }
+  } catch (e) {
+    console.error('Profile load error:', e);
+  }
+}
+
+function formatDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch { return iso; }
+}
+
+// ════════════════════════════════════════════════════════
+//  Toggle climbed (shared between map & list)
+// ════════════════════════════════════════════════════════
+async function toggleClimbed(mountainId) {
+  const m = state.mountains.find(x => x.id === mountainId);
+  if (!m) return;
+  try {
+    if (m.climbed) {
+      await api('DELETE', `/api/climbed/${mountainId}`);
+      m.climbed = false;
+      m.climbed_at = null;
+    } else {
+      await api('POST', `/api/climbed/${mountainId}`);
+      m.climbed = true;
+      m.climbed_at = new Date().toISOString();
+    }
+    updateMarkerOnMap(mountainId);
+    updateListRow(mountainId);
+    updateTopbarStats();
+  } catch (e) {
+    alert('Помилка: ' + e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════════════
+async function initApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  document.getElementById('sidebar-username').textContent = state.username;
+  await loadData();
+}
+
+// ── Entry point ──────────────────────────────────────
+if (state.token) {
+  initApp().catch(() => {
+    // Token expired or invalid — go back to login
+    logout();
+  });
+}
+</script>
+</body>
+</html>
