@@ -377,7 +377,6 @@
         <table>
           <thead>
             <tr>
-              <th onclick="sortBy('id')"># <span class="sort-icon" id="sort-id"></span></th>
               <th onclick="sortBy('name')">Назва <span class="sort-icon" id="sort-name"></span></th>
               <th onclick="sortBy('elevation_m')">Висота <span class="sort-icon" id="sort-elevation_m">▼</span></th>
               <th>Район</th>
@@ -728,7 +727,6 @@ function renderListRows() {
     const btnCls = m.climbed ? 'is-climbed' : 'not-climbed';
     const btnLabel = m.climbed ? '✅ Підкорено' : 'Відмітити';
     return `<tr class="${cls}" id="row-${m.id}">
-      <td class="td-id">${m.id}</td>
       <td class="td-name">${m.name}</td>
       <td class="td-elev">${m.elevation_m} м</td>
       <td class="td-region">${m.raion}</td>
