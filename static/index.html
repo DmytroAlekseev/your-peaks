@@ -362,6 +362,9 @@
     <div id="view-list" class="view">
       <div class="list-controls">
         <input type="text" id="search-input" placeholder="🔍  Пошук за назвою..." oninput="applyFilters()" />
+        <select id="filter-system" onchange="applyFilters()">
+          <option value="">Всі системи</option>
+        </select>
         <select id="filter-oblast" onchange="applyFilters()">
           <option value="">Всі області</option>
         </select>
@@ -379,6 +382,7 @@
             <tr>
               <th onclick="sortBy('name')">Назва <span class="sort-icon" id="sort-name"></span></th>
               <th onclick="sortBy('elevation_m')">Висота <span class="sort-icon" id="sort-elevation_m">▼</span></th>
+              <th onclick="sortBy('mountain_system')">Система <span class="sort-icon" id="sort-mountain_system"></span></th>
               <th>Район</th>
               <th>Стан</th>
             </tr>
@@ -572,6 +576,14 @@ async function loadData() {
   state.mountains = mountains;
   state.meta = meta;
 
+  // Populate mountain system filter
+  const systemSel = document.getElementById('filter-system');
+  meta.mountain_systems.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    systemSel.appendChild(opt);
+  });
+
   // Populate oblast filter
   const oblastSel = document.getElementById('filter-oblast');
   meta.oblasts.forEach(o => {
@@ -654,32 +666,51 @@ function updateMarkerOnMap(mountainId) {
 //  LIST
 // ════════════════════════════════════════════════════════
 function applyFilters() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const oblast = document.getElementById('filter-oblast').value;
-  const raion = document.getElementById('filter-raion').value;
+  const search  = document.getElementById('search-input').value.toLowerCase();
+  const system  = document.getElementById('filter-system').value;
+  const oblast  = document.getElementById('filter-oblast').value;
+  const raion   = document.getElementById('filter-raion').value;
   const minElev = parseInt(document.getElementById('filter-min-elev').value) || 0;
   const maxElev = parseInt(document.getElementById('filter-max-elev').value) || Infinity;
 
   state.filtered = state.mountains.filter(m => {
     if (search && !m.name.toLowerCase().includes(search)) return false;
+    if (system && m.mountain_system !== system) return false;
     if (oblast && m.oblast !== oblast) return false;
-    if (raion && m.raion !== raion) return false;
-    if (m.elevation_m < minElev || m.elevation_m > maxElev) return false;
+    if (raion  && m.raion  !== raion)  return false;
+    const elev = m.elevation_m ?? 0;
+    if (elev < minElev || elev > maxElev) return false;
     if (state.onlyClimbed && !m.climbed) return false;
     return true;
   });
 
   // Sort
   state.filtered.sort((a, b) => {
-    let va = a[state.sortKey], vb = b[state.sortKey];
+    let va = a[state.sortKey] ?? '', vb = b[state.sortKey] ?? '';
     if (typeof va === 'string') va = va.toLowerCase(), vb = vb.toLowerCase();
     return state.sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
   });
 
   renderListRows();
 
-  // Update raion dropdown based on selected oblast
+  // Cascade: narrow oblast dropdown to selected system, raion to selected oblast
+  updateOblastFilter(system);
   updateRaionFilter(oblast);
+}
+
+function updateOblastFilter(selectedSystem) {
+  const oblastSel = document.getElementById('filter-oblast');
+  const current = oblastSel.value;
+  oblastSel.innerHTML = '<option value="">Всі області</option>';
+  const oblasts = selectedSystem
+    ? [...new Set(state.mountains.filter(m => m.mountain_system === selectedSystem).map(m => m.oblast))].filter(Boolean).sort()
+    : state.meta.oblasts;
+  oblasts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o; opt.textContent = o;
+    if (o === current) opt.selected = true;
+    oblastSel.appendChild(opt);
+  });
 }
 
 function updateRaionFilter(selectedOblast) {
@@ -705,7 +736,7 @@ function sortBy(key) {
     state.sortAsc = key === 'name';
   }
   // Update sort icons
-  ['id', 'name', 'elevation_m'].forEach(k => {
+  ['name', 'elevation_m', 'mountain_system'].forEach(k => {
     const el = document.getElementById(`sort-${k}`);
     if (!el) return;
     if (k === state.sortKey) el.textContent = state.sortAsc ? '▲' : '▼';
@@ -728,7 +759,8 @@ function renderListRows() {
     const btnLabel = m.climbed ? '✅ Підкорено' : 'Відмітити';
     return `<tr class="${cls}" id="row-${m.id}">
       <td class="td-name">${m.name}</td>
-      <td class="td-elev">${m.elevation_m} м</td>
+      <td class="td-elev">${m.elevation_m != null ? m.elevation_m + ' м' : '—'}</td>
+      <td class="td-region">${m.mountain_system}</td>
       <td class="td-region">${m.raion}</td>
       <td><button class="climbed-btn ${btnCls}" onclick="toggleClimbed('${m.id}')">${btnLabel}</button></td>
     </tr>`;

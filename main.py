@@ -58,6 +58,7 @@ def login(user: UserLogin):
 @app.get("/api/mountains")
 def get_mountains(
     search: Optional[str] = None,
+    mountain_system: Optional[str] = None,
     oblast: Optional[str] = None,
     raion: Optional[str] = None,
     min_elevation: Optional[int] = None,
@@ -65,7 +66,7 @@ def get_mountains(
     current_user: dict = Depends(auth.get_current_user),
 ):
     all_mountains = [dict(m) for m in utils.load_mountains()]
-    filtered = utils.filter_mountains(all_mountains, search, oblast, raion, min_elevation, max_elevation)
+    filtered = utils.filter_mountains(all_mountains, search, mountain_system, oblast, raion, min_elevation, max_elevation)
 
     climbed = database.get_climbed_ids(current_user["id"])
     for m in filtered:
@@ -82,6 +83,7 @@ def get_mountains(
 @app.get("/api/mountains/meta")
 def get_meta(current_user: dict = Depends(auth.get_current_user)):
     return {
+        "mountain_systems": utils.get_all_mountain_systems(),
         "oblasts": utils.get_all_oblasts(),
         "raions": utils.get_all_raions(),
         "total": len(utils.load_mountains()),
