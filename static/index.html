@@ -852,7 +852,6 @@ async function loadProfile() {
           <div>
             <div class="ci-name">${m.name}</div>
             <div class="ci-region">${m.raion}</div>
-            ${m.climbed_at ? `<div class="ci-date">${formatDate(m.climbed_at)}</div>` : ''}
           </div>
           <div class="ci-elev">${m.elevation_m} м</div>
         </div>`).join('');
