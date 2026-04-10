@@ -35,6 +35,10 @@ class ClimbToggle(BaseModel):
     notes: Optional[str] = None
 
 
+class GoalToggle(BaseModel):
+    pass
+
+
 class ProfileResponse(BaseModel):
     username: str
     email: str

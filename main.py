@@ -69,6 +69,7 @@ def get_mountains(
     filtered = utils.filter_mountains(all_mountains, search, mountain_system, oblast, raion, min_elevation, max_elevation)
 
     climbed = database.get_climbed_ids(current_user["id"])
+    goals = database.get_goal_ids(current_user["id"])
     for m in filtered:
         if m["id"] in climbed:
             m["climbed"] = True
@@ -76,6 +77,12 @@ def get_mountains(
         else:
             m["climbed"] = False
             m["climbed_at"] = None
+        if m["id"] in goals:
+            m["goal"] = True
+            m["goal_added_at"] = goals[m["id"]]["added_at"]
+        else:
+            m["goal"] = False
+            m["goal_added_at"] = None
 
     return filtered
 
@@ -113,15 +120,42 @@ def unmark_climbed(
     return {"status": "unclimbed"}
 
 
+# ── Goal ──────────────────────────────────────────────────────────────────────
+
+@app.post("/api/goal/{mountain_id}")
+def mark_goal(
+    mountain_id: str,
+    current_user: dict = Depends(auth.get_current_user),
+):
+    if not utils.get_mountain_by_id(mountain_id):
+        raise HTTPException(status_code=404, detail="Mountain not found")
+    database.add_goal(current_user["id"], mountain_id)
+    return {"status": "goal"}
+
+
+@app.delete("/api/goal/{mountain_id}")
+def unmark_goal(
+    mountain_id: str,
+    current_user: dict = Depends(auth.get_current_user),
+):
+    database.remove_goal(current_user["id"], mountain_id)
+    return {"status": "ungoal"}
+
+
 # ── Profile ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/profile")
 def get_profile(current_user: dict = Depends(auth.get_current_user)):
     all_mountains = utils.load_mountains()
-    total = len(all_mountains)
     climbed_map = database.get_climbed_ids(current_user["id"])
+    goal_map = database.get_goal_ids(current_user["id"])
+
     climbed_count = len(climbed_map)
-    climbed_percent = round(climbed_count / total * 100, 1) if total > 0 else 0.0
+    # goals that are NOT yet climbed
+    pending_goal_count = len([gid for gid in goal_map if gid not in climbed_map])
+    # total goals = climbed + pending goals
+    total_goal_count = climbed_count + pending_goal_count
+    goal_climbed_percent = round(climbed_count / total_goal_count * 100, 1) if total_goal_count > 0 else 0.0
 
     climbed_mountains = []
     for m in all_mountains:
@@ -129,17 +163,31 @@ def get_profile(current_user: dict = Depends(auth.get_current_user)):
             entry = dict(m)
             entry["climbed"] = True
             entry["climbed_at"] = climbed_map[m["id"]]["climbed_at"]
+            entry["goal"] = m["id"] in goal_map
             climbed_mountains.append(entry)
 
     climbed_mountains.sort(key=lambda x: x["elevation_m"], reverse=True)
 
+    goal_mountains = []
+    for m in all_mountains:
+        if m["id"] in goal_map and m["id"] not in climbed_map:
+            entry = dict(m)
+            entry["climbed"] = False
+            entry["goal"] = True
+            entry["goal_added_at"] = goal_map[m["id"]]["added_at"]
+            goal_mountains.append(entry)
+
+    goal_mountains.sort(key=lambda x: x["elevation_m"], reverse=True)
+
     return {
         "username": current_user["username"],
         "email": current_user["email"],
-        "total_mountains": total,
         "climbed_count": climbed_count,
-        "climbed_percent": climbed_percent,
+        "pending_goal_count": pending_goal_count,
+        "total_goal_count": total_goal_count,
+        "goal_climbed_percent": goal_climbed_percent,
         "climbed_mountains": climbed_mountains,
+        "goal_mountains": goal_mountains,
     }
 
 

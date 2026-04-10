@@ -26,6 +26,8 @@
       --text-muted: #6c757d;
       --border: #dee2e6;
       --climbed-color: #40916c;
+      --goal-color: #f4a62a;
+      --goal-bg: #fff8ee;
       --unchecked-color: #adb5bd;
       --danger: #dc3545;
       --shadow: 0 2px 8px rgba(0,0,0,.10);
@@ -178,6 +180,8 @@
     tbody tr:hover { background: #f9fbfa; }
     tbody tr.climbed-row { background: #f0faf5; }
     tbody tr.climbed-row:hover { background: #e6f7ee; }
+    tbody tr.goal-row { background: #fffbf2; }
+    tbody tr.goal-row:hover { background: #fff3d6; }
 
     td { padding: 10px 16px; vertical-align: middle; }
     td.td-id { color: var(--text-muted); font-size: 12px; }
@@ -197,6 +201,19 @@
       background: var(--climbed-color); border-color: var(--climbed-color); color: white;
     }
     .climbed-btn.is-climbed:hover { background: var(--danger); border-color: var(--danger); }
+
+    .goal-btn {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid; transition: all .15s; margin-left: 6px;
+    }
+    .goal-btn.not-goal {
+      background: transparent; border-color: var(--unchecked-color); color: var(--unchecked-color);
+    }
+    .goal-btn.not-goal:hover { border-color: var(--goal-color); color: var(--goal-color); }
+    .goal-btn.is-goal {
+      background: var(--goal-color); border-color: var(--goal-color); color: white;
+    }
+    .goal-btn.is-goal:hover { background: var(--danger); border-color: var(--danger); }
 
     .list-count { padding: 8px 20px; font-size: 13px; color: var(--text-muted); background: var(--bg); flex-shrink: 0; border-top: 1px solid var(--border); }
 
@@ -246,18 +263,23 @@
     .empty-state .es-icon { font-size: 48px; display: block; margin-bottom: 12px; }
 
     /* Map popup custom style */
-    .map-popup { min-width: 180px; }
+    .map-popup { min-width: 200px; }
     .map-popup h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
     .map-popup .mp-elev { font-size: 13px; color: var(--climbed-color); font-weight: 600; margin-bottom: 4px; }
     .map-popup .mp-region { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .map-popup .mp-actions { display: flex; flex-direction: column; gap: 6px; }
     .map-popup .mp-btn {
       display: block; width: 100%; padding: 7px 0; border-radius: 6px;
-      font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+      font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid transparent; transition: all .15s;
     }
-    .map-popup .mp-btn.not-climbed { background: var(--sidebar-bg); color: white; }
-    .map-popup .mp-btn.not-climbed:hover { background: var(--sidebar-active); }
-    .map-popup .mp-btn.is-climbed { background: #e9f7ef; color: var(--climbed-color); border: 1.5px solid var(--climbed-color); }
+    .map-popup .mp-btn.not-climbed { background: var(--sidebar-bg); color: white; border-color: var(--sidebar-bg); }
+    .map-popup .mp-btn.not-climbed:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); }
+    .map-popup .mp-btn.is-climbed { background: #e9f7ef; color: var(--climbed-color); border-color: var(--climbed-color); }
     .map-popup .mp-btn.is-climbed:hover { background: #fdecea; color: var(--danger); border-color: var(--danger); }
+    .map-popup .mp-btn.not-goal { background: transparent; color: var(--goal-color); border-color: var(--goal-color); }
+    .map-popup .mp-btn.not-goal:hover { background: #fff3d6; }
+    .map-popup .mp-btn.is-goal { background: var(--goal-color); color: white; border-color: var(--goal-color); }
+    .map-popup .mp-btn.is-goal:hover { background: var(--danger); border-color: var(--danger); }
 
     .hidden { display: none !important; }
   </style>
@@ -404,21 +426,21 @@
 
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-value" id="stat-total">—</div>
-            <div class="stat-label">Всього вершин</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-climbed">—</div>
+            <div class="stat-value" id="stat-climbed" style="color: var(--climbed-color)">—</div>
             <div class="stat-label">Підкорено</div>
           </div>
           <div class="stat-card">
+            <div class="stat-value" id="stat-goals" style="color: var(--goal-color)">—</div>
+            <div class="stat-label">Цілей (в очікуванні)</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-value" id="stat-percent">—</div>
-            <div class="stat-label">Прогрес</div>
+            <div class="stat-label">% підкорених серед цілей</div>
           </div>
         </div>
 
         <div class="progress-section">
-          <h3>Загальний прогрес</h3>
+          <h3>Прогрес серед цілей</h3>
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
           </div>
@@ -428,6 +450,11 @@
         <div class="climbed-list-section">
           <h3>Підкорені вершини</h3>
           <div id="profile-climbed-list"></div>
+        </div>
+
+        <div class="climbed-list-section" style="margin-top: 20px;">
+          <h3 style="color: var(--goal-color)">🎯 Цілі (ще не підкорені)</h3>
+          <div id="profile-goal-list"></div>
         </div>
       </div>
     </div>
@@ -599,34 +626,39 @@ async function loadData() {
 
 function updateTopbarStats() {
   const climbed = state.mountains.filter(m => m.climbed).length;
+  const goals = state.mountains.filter(m => m.goal && !m.climbed).length;
   const total = state.mountains.length;
   document.getElementById('topbar-stats').innerHTML =
-    `Підкорено: <span>${climbed}</span> з ${total}`;
+    `Підкорено: <span>${climbed}</span> · Цілей: <span>${goals}</span> · Всього: ${total}`;
 }
 
 // ════════════════════════════════════════════════════════
 //  MAP
 // ════════════════════════════════════════════════════════
-function markerOptions(climbed) {
-  return {
-    radius: climbed ? 7 : 5,
-    fillColor: climbed ? '#40916c' : '#adb5bd',
-    color: climbed ? '#1b4332' : '#6c757d',
-    weight: 1,
-    opacity: 1,
-    fillOpacity: climbed ? 0.9 : 0.7,
-  };
+function markerOptions(climbed, goal) {
+  if (climbed) {
+    return { radius: 7, fillColor: '#40916c', color: '#1b4332', weight: 1, opacity: 1, fillOpacity: 0.9 };
+  } else if (goal) {
+    return { radius: 6, fillColor: '#f4a62a', color: '#c47a10', weight: 1, opacity: 1, fillOpacity: 0.9 };
+  } else {
+    return { radius: 5, fillColor: '#adb5bd', color: '#6c757d', weight: 1, opacity: 1, fillOpacity: 0.7 };
+  }
 }
 
 function buildPopupHtml(m) {
-  const cls = m.climbed ? 'is-climbed' : 'not-climbed';
-  const label = m.climbed ? '✅ Підкорено — зняти позначку' : '🏔 Відмітити як підкорену';
+  const climbCls = m.climbed ? 'is-climbed' : 'not-climbed';
+  const climbLabel = m.climbed ? '✅ Підкорено — зняти' : '🏔 Відмітити як підкорену';
+  const goalCls = m.goal ? 'is-goal' : 'not-goal';
+  const goalLabel = m.goal ? '🎯 Ціль — зняти' : '🎯 Додати до цілей';
   return `
     <div class="map-popup">
       <h4>${m.name}</h4>
       <div class="mp-elev">${m.elevation_m} м</div>
       <div class="mp-region">${m.raion}</div>
-      <button class="mp-btn ${cls}" onclick="toggleClimbed('${m.id}')">${label}</button>
+      <div class="mp-actions">
+        <button class="mp-btn ${climbCls}" onclick="toggleClimbed('${m.id}')">${climbLabel}</button>
+        <button class="mp-btn ${goalCls}" onclick="toggleGoal('${m.id}')">${goalLabel}</button>
+      </div>
     </div>`;
 }
 
@@ -644,8 +676,8 @@ function renderMap() {
   state.markers = {};
 
   state.mountains.forEach(m => {
-    const marker = L.circleMarker([m.lat, m.lon], markerOptions(m.climbed))
-      .bindPopup(buildPopupHtml(m), { maxWidth: 220 })
+    const marker = L.circleMarker([m.lat, m.lon], markerOptions(m.climbed, m.goal))
+      .bindPopup(buildPopupHtml(m), { maxWidth: 240 })
       .addTo(state.map);
     state.markers[m.id] = marker;
   });
@@ -655,11 +687,8 @@ function updateMarkerOnMap(mountainId) {
   const m = state.mountains.find(x => x.id === mountainId);
   if (!m || !state.markers[mountainId]) return;
   const marker = state.markers[mountainId];
-  marker.setStyle(markerOptions(m.climbed));
-  // Refresh popup content if open
-  if (marker.isPopupOpen()) {
-    marker.setPopupContent(buildPopupHtml(m));
-  }
+  marker.setStyle(markerOptions(m.climbed, m.goal));
+  marker.setPopupContent(buildPopupHtml(m));
 }
 
 // ════════════════════════════════════════════════════════
@@ -754,15 +783,20 @@ function toggleOnlyClimbed() {
 function renderListRows() {
   const tbody = document.getElementById('mountains-tbody');
   const rows = state.filtered.map(m => {
-    const cls = m.climbed ? 'climbed-row' : '';
+    const rowCls = m.climbed ? 'climbed-row' : (m.goal ? 'goal-row' : '');
     const btnCls = m.climbed ? 'is-climbed' : 'not-climbed';
     const btnLabel = m.climbed ? '✅ Підкорено' : 'Відмітити';
-    return `<tr class="${cls}" id="row-${m.id}">
+    const goalCls = m.goal ? 'is-goal' : 'not-goal';
+    const goalLabel = m.goal ? '🎯' : '+ Ціль';
+    return `<tr class="${rowCls}" id="row-${m.id}">
       <td class="td-name">${m.name}</td>
       <td class="td-elev">${m.elevation_m != null ? m.elevation_m + ' м' : '—'}</td>
       <td class="td-region">${m.mountain_system}</td>
       <td class="td-region">${m.raion}</td>
-      <td><button class="climbed-btn ${btnCls}" onclick="toggleClimbed('${m.id}')">${btnLabel}</button></td>
+      <td>
+        <button class="climbed-btn ${btnCls}" onclick="toggleClimbed('${m.id}')">${btnLabel}</button>
+        <button class="goal-btn ${goalCls}" onclick="toggleGoal('${m.id}')">${goalLabel}</button>
+      </td>
     </tr>`;
   });
   tbody.innerHTML = rows.join('');
@@ -780,10 +814,15 @@ function updateListRow(mountainId) {
   const m = state.mountains.find(x => x.id === mountainId);
   const row = document.getElementById(`row-${m.id}`);
   if (!row) return;
-  row.className = m.climbed ? 'climbed-row' : '';
+  row.className = m.climbed ? 'climbed-row' : (m.goal ? 'goal-row' : '');
   const btn = row.querySelector('.climbed-btn');
   btn.className = `climbed-btn ${m.climbed ? 'is-climbed' : 'not-climbed'}`;
   btn.textContent = m.climbed ? '✅ Підкорено' : 'Відмітити';
+  const goalBtn = row.querySelector('.goal-btn');
+  if (goalBtn) {
+    goalBtn.className = `goal-btn ${m.goal ? 'is-goal' : 'not-goal'}`;
+    goalBtn.textContent = m.goal ? '🎯' : '+ Ціль';
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -794,18 +833,21 @@ async function loadProfile() {
     const p = await api('GET', '/api/profile');
     document.getElementById('profile-username').textContent = p.username;
     document.getElementById('profile-email').textContent = p.email;
-    document.getElementById('stat-total').textContent = p.total_mountains;
     document.getElementById('stat-climbed').textContent = p.climbed_count;
-    document.getElementById('stat-percent').textContent = p.climbed_percent + '%';
-    document.getElementById('progress-fill').style.width = p.climbed_percent + '%';
+    document.getElementById('stat-goals').textContent = p.pending_goal_count;
+    document.getElementById('stat-percent').textContent = p.goal_climbed_percent + '%';
+    document.getElementById('progress-fill').style.width = p.goal_climbed_percent + '%';
     document.getElementById('progress-label').textContent =
-      `${p.climbed_count} з ${p.total_mountains} вершин підкорено`;
+      p.total_goal_count > 0
+        ? `${p.climbed_count} підкорено з ${p.total_goal_count} цілей`
+        : 'Додай цілі, щоб відстежувати прогрес';
 
-    const list = document.getElementById('profile-climbed-list');
+    // Climbed mountains list
+    const climbedList = document.getElementById('profile-climbed-list');
     if (p.climbed_mountains.length === 0) {
-      list.innerHTML = `<div class="empty-state"><span class="es-icon">🏔</span>Ще жодної вершини не підкорено.<br>Починай свій шлях!</div>`;
+      climbedList.innerHTML = `<div class="empty-state"><span class="es-icon">🏔</span>Ще жодної вершини не підкорено.<br>Починай свій шлях!</div>`;
     } else {
-      list.innerHTML = p.climbed_mountains.map(m => `
+      climbedList.innerHTML = p.climbed_mountains.map(m => `
         <div class="climbed-item">
           <div>
             <div class="ci-name">${m.name}</div>
@@ -813,6 +855,22 @@ async function loadProfile() {
             ${m.climbed_at ? `<div class="ci-date">${formatDate(m.climbed_at)}</div>` : ''}
           </div>
           <div class="ci-elev">${m.elevation_m} м</div>
+        </div>`).join('');
+    }
+
+    // Goal mountains list (pending)
+    const goalList = document.getElementById('profile-goal-list');
+    if (p.goal_mountains.length === 0) {
+      goalList.innerHTML = `<div class="empty-state"><span class="es-icon">🎯</span>Немає активних цілей.<br>Додай вершини які хочеш підкорити!</div>`;
+    } else {
+      goalList.innerHTML = p.goal_mountains.map(m => `
+        <div class="climbed-item">
+          <div>
+            <div class="ci-name">${m.name}</div>
+            <div class="ci-region">${m.raion}</div>
+            ${m.goal_added_at ? `<div class="ci-date">Додано: ${formatDate(m.goal_added_at)}</div>` : ''}
+          </div>
+          <div class="ci-elev" style="color: var(--goal-color)">${m.elevation_m} м</div>
         </div>`).join('');
     }
   } catch (e) {
@@ -827,7 +885,7 @@ function formatDate(iso) {
 }
 
 // ════════════════════════════════════════════════════════
-//  Toggle climbed (shared between map & list)
+//  Toggle climbed / goal (shared between map & list)
 // ════════════════════════════════════════════════════════
 async function toggleClimbed(mountainId) {
   const m = state.mountains.find(x => x.id === mountainId);
@@ -841,6 +899,27 @@ async function toggleClimbed(mountainId) {
       await api('POST', `/api/climbed/${mountainId}`);
       m.climbed = true;
       m.climbed_at = new Date().toISOString();
+    }
+    updateMarkerOnMap(mountainId);
+    updateListRow(mountainId);
+    updateTopbarStats();
+  } catch (e) {
+    alert('Помилка: ' + e.message);
+  }
+}
+
+async function toggleGoal(mountainId) {
+  const m = state.mountains.find(x => x.id === mountainId);
+  if (!m) return;
+  try {
+    if (m.goal) {
+      await api('DELETE', `/api/goal/${mountainId}`);
+      m.goal = false;
+      m.goal_added_at = null;
+    } else {
+      await api('POST', `/api/goal/${mountainId}`);
+      m.goal = true;
+      m.goal_added_at = new Date().toISOString();
     }
     updateMarkerOnMap(mountainId);
     updateListRow(mountainId);

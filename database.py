@@ -36,6 +36,17 @@ def init_db():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS goal_mountains (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            mountain_id TEXT NOT NULL,
+            added_at    TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            UNIQUE(user_id, mountain_id)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -115,6 +126,50 @@ def get_climbed_ids(user_id: int) -> dict:
         cur = conn.cursor()
         cur.execute(
             "SELECT mountain_id, climbed_at, notes FROM climbed_mountains WHERE user_id = ?",
+            (user_id,),
+        )
+        return {row["mountain_id"]: dict(row) for row in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+# ── Goal mountains ────────────────────────────────────────────────────────────
+
+def add_goal(user_id: int, mountain_id: str) -> bool:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT OR IGNORE INTO goal_mountains (user_id, mountain_id) VALUES (?, ?)",
+            (user_id, mountain_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def remove_goal(user_id: int, mountain_id: str) -> bool:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM goal_mountains WHERE user_id = ? AND mountain_id = ?",
+            (user_id, mountain_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def get_goal_ids(user_id: int) -> dict:
+    """Returns {mountain_id: {added_at}} for the given user."""
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT mountain_id, added_at FROM goal_mountains WHERE user_id = ?",
             (user_id,),
         )
         return {row["mountain_id"]: dict(row) for row in cur.fetchall()}
